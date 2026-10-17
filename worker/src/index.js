@@ -105,7 +105,24 @@ export function parseOhlc(result, { dropForming = true } = {}) {
   }));
 }
 
-export async function getTicker() {
+// Short-lived cache for public market data. Every open dashboard polls, so without this the Worker
+// could exhaust Kraken's public rate limit on behalf of all of them.
+export const CACHE_MS = 10000;
+const cache = new Map();
+export function clearCache() { cache.clear(); }
+async function cached(key, ttlMs, load) {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+  const value = await load();
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+export function getTicker() {
+  return cached("ticker", CACHE_MS, loadTicker);
+}
+
+async function loadTicker() {
   const result = await krakenPublic("Ticker", { pair: PAIR });
   return {
     pair: "BTC/GBP",
@@ -118,16 +135,22 @@ export async function getTicker() {
 // Public pair metadata. Field names are unverified against Kraken's reference page (not reachable during
 // this build), so every required field is checked and a missing one is an error, never a default.
 export function parsePairLimits(result) {
+  // Every field here is required. A missing value is an error, never a default.
   const p = Object.values(result || {})[0];
   if (!p) throw httpError("AssetPairs result missing", 502);
   const ordermin = Number(p.ordermin);
   const costmin = Number(p.costmin);
   if (!(ordermin > 0) || !(costmin > 0)) throw httpError("pair minimums missing from AssetPairs", 502);
+  const tick = Number(p.tick_size);
+  const lot = Number(p.lot_decimals);
+  if (!(tick > 0) || !Number.isInteger(lot) || lot < 0) {
+    throw httpError("tick size or lot decimals missing from AssetPairs", 502);
+  }
   return {
     minVolumeBase: ordermin,
     minCostGbp: costmin,
-    tickSize: p.tick_size != null ? Number(p.tick_size) : null,
-    lotDecimals: p.lot_decimals != null ? Number(p.lot_decimals) : null,
+    tickSize: tick,
+    lotDecimals: lot,
     source: "Kraken public AssetPairs",
   };
 }
@@ -136,13 +159,20 @@ export async function getPairLimits() {
   return parsePairLimits(await krakenPublic("AssetPairs", { pair: PAIR }));
 }
 
-export async function getSignal() {
+export function getSignal() {
+  return cached("signal", CACHE_MS, loadSignal);
+}
+
+async function loadSignal() {
   const [r15, r5] = await Promise.all([
     krakenPublic("OHLC", { pair: PAIR, interval: 15 }),
     krakenPublic("OHLC", { pair: PAIR, interval: 5 }),
   ]);
-  const signal = evaluateSignal(parseOhlc(r15), parseOhlc(r5));
-  return { ...signal, asOf: new Date().toISOString() };
+  const closed5 = parseOhlc(r5);
+  const signal = evaluateSignal(parseOhlc(r15), closed5);
+  // Close time of the newest closed 5m candle. Lets clients refuse proposals built on stale data.
+  const lastCandleCloseSeconds = closed5.length ? closed5[closed5.length - 1].time + 300 : null;
+  return { ...signal, lastCandleCloseSeconds, asOf: new Date().toISOString() };
 }
 
 /* ---------- Kraken private (read-only) ---------- */
@@ -185,7 +215,7 @@ export async function fetchKrakenBalances(env) {
   });
   const body = await res.json().catch(() => ({ error: ["Invalid response from Kraken"] }));
   if (body.error && body.error.length) throw httpError(body.error.join("; "), classifyKrakenError(body.error));
-  return body.result;
+  return body.result || {};
 }
 
 export async function getBalances(env) {

@@ -2,6 +2,20 @@
 // Both are designed to work without the dashboard, the model or the browser.
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+
+// Used-token records must survive restarts, or a token could be replayed after a crash.
+export function loadConsumed(path) {
+  if (!existsSync(path)) return new Set();
+  return new Set(JSON.parse(readFileSync(path, "utf8")));
+}
+
+// Write-then-rename so a crash mid-write cannot corrupt the record.
+export function saveConsumed(path, consumed) {
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, JSON.stringify([...consumed]));
+  renameSync(tmp, path);
+}
 
 /**
  * Halted if either the environment flag or the halt file is present.
@@ -31,7 +45,9 @@ export function createApproval({ proposalId, secret, nowSeconds, ttlSeconds = 30
  */
 export function verifyApproval({ token, secret, proposalId, nowSeconds, consumed }) {
   if (typeof token !== "string" || !token.includes(".")) return { ok: false, reason: "malformed token" };
-  const [payload, sig] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, reason: "malformed token" };
+  const [payload, sig] = parts;
   const expected = b64url(createHmac("sha256", secret).update(payload).digest());
   const a = Buffer.from(sig), b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: "bad signature" };

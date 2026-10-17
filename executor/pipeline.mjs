@@ -6,7 +6,7 @@
 
 import { checkPreTrade } from "./limits.mjs";
 import { isHalted, verifyApproval } from "./safety.mjs";
-import { buildValidateOrder, assertValidateOnly } from "./order.mjs";
+import { buildValidateOrder, assertValidateOnly, floorTo } from "./order.mjs";
 
 /**
  * @returns {{ status: "blocked"|"ready", reasons: string[], params: object|null }}
@@ -43,6 +43,14 @@ export function prepareOrder({
     if (!v.ok) reasons.push(`approval rejected: ${v.reason}`);
   }
 
+  // Rounding the size down to the pair's lot precision can drop it below the minimum. Re-check after rounding.
+  if (reasons.length === 0 && plan && pairLimits && Number.isInteger(pairLimits.lotDecimals)) {
+    const volume = floorTo(plan.qty, 10 ** -pairLimits.lotDecimals);
+    if (volume < pairLimits.minVolumeBase) {
+      reasons.push("size after rounding down to lot precision is below the Kraken minimum");
+    }
+  }
+
   if (reasons.length > 0) return { status: "blocked", reasons, params: null };
 
   // Only reached when every check passes. The request is validate-only by construction.
@@ -52,6 +60,8 @@ export function prepareOrder({
       volumeBase: plan.qty,
       limitPrice: proposal.entry,
       expireAtSeconds: Math.floor(Date.parse(proposal.expiresAt) / 1000),
+      tickSize: pairLimits.tickSize,
+      lotDecimals: pairLimits.lotDecimals,
     }),
   );
   return { status: "ready", reasons: [], params };

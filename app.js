@@ -106,9 +106,15 @@ async function refreshSignal() {
       </dl>
       <p class="small muted">Signals are checked on closed candles only.</p>`;
     const rejected = $("#rejected");
-    rejected.textContent = s.rejectedReason ? `No plan: ${s.rejectedReason}` : "";
-    rejected.hidden = !s.rejectedReason;
-    currentProposals = s.proposals || [];
+    // Proposals built on old candles must not be shown. Treat missing or old data as stale.
+    const ageSeconds = s.lastCandleCloseSeconds ? Date.now() / 1000 - s.lastCandleCloseSeconds : Infinity;
+    const stale = !(ageSeconds >= 0 && ageSeconds <= 600);
+    const message = stale
+      ? "Signal data is stale (no recent closed candle). No proposals are shown."
+      : s.rejectedReason ? `No plan: ${s.rejectedReason}` : "";
+    rejected.textContent = message;
+    rejected.hidden = !message;
+    currentProposals = stale ? [] : s.proposals || [];
     renderProposals();
   } catch (err) {
     el.innerHTML = `<p class="muted">${escapeHtml(err.status === 503 ? notConfiguredMessage() : `Signal unavailable: ${err.message}.`)}</p>`;

@@ -11,7 +11,7 @@ const NOW = 1_700_000_000;
 const SECRET = "d".repeat(40);
 const proposal = { id: "p-drill", entry: 100000, stop: 97000, target: 106000, expiresAt: new Date((NOW + 600) * 1000).toISOString() };
 const plan = computePlan(proposal);
-const pairLimits = { minVolumeBase: 0.0001, minCostGbp: 5 };
+const pairLimits = { minVolumeBase: 0.0001, minCostGbp: 5, tickSize: 0.1, lotDecimals: 8 };
 const market = { price: 100020, lastCandleCloseSeconds: NOW - 60 };
 const state = { openPositions: 0, ordersToday: 0, dailyLossGbp: 0, totalLossGbp: 0 };
 const noFile = () => false;
@@ -81,4 +81,12 @@ test("parsePairLimits reads minimums and refuses when they are missing", () => {
   assert.equal(ok.minVolumeBase, 0.0001);
   assert.equal(ok.minCostGbp, 5);
   assert.throws(() => parsePairLimits({ XXBTZGBP: { costmin: "5" } }), /minimums missing/);
+});
+
+test("drill: a size that falls below the minimum once rounded to lot precision is refused", () => {
+  // 0.1 lot decimals makes the size round down to 0.0 BTC, which is below the 0.0001 minimum.
+  const coarse = { ...pairLimits, lotDecimals: 1 };
+  const r = attempt({ pairLimits: coarse });
+  assert.equal(r.status, "blocked");
+  assert.match(r.reasons.join(" "), /rounding down to lot precision/);
 });

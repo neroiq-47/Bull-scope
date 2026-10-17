@@ -15,7 +15,26 @@ This records what is built toward the trading plan in `TRADING-PLAN.md`, and wha
 | `executor/pipeline.mjs` | Dry run: combines the kill switch, pre-trade checks and single-use approval, then returns `ready` with a validate-only request or `blocked` with reasons. It never sends anything. |
 | `worker/src/index.js` → `/v1/market/pair-limits` | Public AssetPairs minimums for `XBTGBP`. Field names are unverified against Kraken's reference, and a missing field is an error. |
 
-Tests: `test/executor.test.mjs` and `test/drills.test.mjs` (scripted kill-switch, approval-replay, loss-stop and reconciliation drills). Run `npm test`: 71 passing.
+Tests: `test/executor.test.mjs` and `test/drills.test.mjs` (scripted kill-switch, approval-replay, loss-stop and reconciliation drills). Run `npm test`: 79 passing.
+
+## Audit fixes (latest pass)
+
+- Order prices round down to the pair's tick size, and volumes round down to lot precision. Previously prices were hard-coded to two decimals and volume was rounded, which could exceed the risk budget.
+- A size that falls below the Kraken minimum after rounding is refused.
+- Pair limits must include tick size and lot decimals. Missing values refuse rather than fall back to defaults.
+- Approval tokens must have exactly two segments. Used-token records persist to disk, so a restart cannot replay a token.
+- Strategy sizing now honours the strategy config passed in, rather than silently using defaults.
+- Public Kraken market data is cached for 10 seconds, so polling dashboards cannot exhaust the public rate limit.
+- Signals report the close time of the newest closed candle. The dashboard refuses to show proposals built on data older than 10 minutes.
+- Balance parsing tolerates an empty Kraken result.
+- The agent CLI has a 15-second timeout on the signal fetch and does not start a second review while one is running.
+
+## Known gaps still open
+
+- The backtest omits any trade still open when the data ends. Report it or close it at the last bar.
+- Expired proposals are still sent to the reviewer, which wastes a model call.
+- No approval interface issues tokens yet.
+- Pair-limit field names are unverified against Kraken's reference page.
 
 ## Not built, on purpose
 

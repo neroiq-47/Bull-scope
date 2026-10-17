@@ -26,8 +26,14 @@ export function checkPreTrade({ proposal, plan, market, state, pairLimits, nowSe
   const reasons = [];
 
   if (!plan) reasons.push("plan could not be computed");
-  if (!pairLimits || !(pairLimits.minVolumeBase > 0) || !(pairLimits.minCostGbp > 0)) {
-    reasons.push("pair minimums unavailable: refusing rather than guessing");
+  if (
+    !pairLimits ||
+    !(pairLimits.minVolumeBase > 0) ||
+    !(pairLimits.minCostGbp > 0) ||
+    !(pairLimits.tickSize > 0) ||
+    !Number.isInteger(pairLimits.lotDecimals)
+  ) {
+    reasons.push("pair limits unavailable (minimums, tick size or lot decimals): refusing rather than guessing");
   }
   if (plan && pairLimits) {
     // Never round up to meet a minimum. A trade below the minimum is simply not taken.

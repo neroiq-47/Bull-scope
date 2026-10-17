@@ -150,7 +150,15 @@ export function evaluateSignal(c15, c5, cfg = CONFIG) {
   const stop = Math.min(swingLow * 0.999, entry * (1 - cfg.minStopPct));
   const target = entry + cfg.targetR * (entry - stop);
 
-  const plan = computePlan({ entry, stop, target });
+  const plan = computePlan({
+    entry,
+    stop,
+    target,
+    accountGbp: cfg.accountGbp,
+    riskPct: cfg.riskPct,
+    capPct: cfg.capPct,
+    takerFeeRate: cfg.takerFeeRate,
+  });
   if (!plan) {
     result.rejectedReason = "Could not place valid levels.";
     return result;

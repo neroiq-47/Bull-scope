@@ -10,7 +10,7 @@ import { computePlan } from "../js/strategy.js";
 const NOW = 1_700_000_000;
 const proposal = { entry: 100000, stop: 97000, target: 106000, expiresAt: new Date((NOW + 600) * 1000).toISOString() };
 const plan = computePlan(proposal);
-const pairLimits = { minVolumeBase: 0.0001, minCostGbp: 5 };
+const pairLimits = { minVolumeBase: 0.0001, minCostGbp: 5, tickSize: 0.1, lotDecimals: 8 };
 const market = { price: 100050, lastCandleCloseSeconds: NOW - 120 };
 const cleanState = { openPositions: 0, ordersToday: 0, dailyLossGbp: 0, totalLossGbp: 0 };
 const run = (over = {}) => checkPreTrade({ proposal, plan, market, state: cleanState, pairLimits, nowSeconds: NOW, ...over });
@@ -23,7 +23,50 @@ test("a clean setup is allowed", () => {
 test("missing pair minimums refuse rather than guess", () => {
   const r = run({ pairLimits: null });
   assert.equal(r.allowed, false);
-  assert.match(r.reasons.join(" "), /minimums unavailable/);
+  assert.match(r.reasons.join(" "), /pair limits unavailable/);
+});
+
+test("missing tick size or lot decimals refuse rather than guess", () => {
+  assert.equal(run({ pairLimits: { minVolumeBase: 0.0001, minCostGbp: 5 } }).allowed, false);
+  assert.equal(run({ pairLimits: { minVolumeBase: 0.0001, minCostGbp: 5, tickSize: 0.1 } }).allowed, false);
+});
+
+test("approval tokens with extra segments are malformed", () => {
+  const secret = "x".repeat(40);
+  const token = createApproval({ proposalId: "p-9", secret, nowSeconds: NOW });
+  const tampered = `${token}.extra`;
+  assert.equal(verifyApproval({ token: tampered, secret, proposalId: "p-9", nowSeconds: NOW, consumed: new Set() }).reason, "malformed token");
+});
+
+test("used-token records persist across restarts", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { loadConsumed, saveConsumed } = await import("../executor/safety.mjs");
+  const dir = mkdtempSync(join(tmpdir(), "bull-scope-consumed-"));
+  const path = join(dir, "consumed.json");
+  try {
+    const secret = "x".repeat(40);
+    const consumed = loadConsumed(path);
+    const token = createApproval({ proposalId: "p-10", secret, nowSeconds: NOW });
+    assert.equal(verifyApproval({ token, secret, proposalId: "p-10", nowSeconds: NOW, consumed }).ok, true);
+    saveConsumed(path, consumed);
+    // Simulate a restart: reload from disk. The same token must now be refused.
+    const after = loadConsumed(path);
+    assert.equal(verifyApproval({ token, secret, proposalId: "p-10", nowSeconds: NOW, consumed: after }).reason, "token already used");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("prices round down to the tick and volumes round down to lot precision", () => {
+  const params = buildValidateOrder({ intentId: "i-r", volumeBase: 0.00123456789, limitPrice: 100000.09, expireAtSeconds: NOW + 1800, tickSize: 0.1, lotDecimals: 8 });
+  assert.equal(params.price, "100000.0");
+  assert.equal(params.volume, "0.00123456");
+});
+
+test("building an order without tick size or lot decimals throws", () => {
+  assert.throws(() => buildValidateOrder({ intentId: "i-x", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800 }), /required/);
 });
 
 test("a size below the Kraken minimum is refused, not rounded up", () => {
@@ -81,7 +124,7 @@ test("approval secrets must be strong enough", () => {
 });
 
 test("built orders are always validate-only", () => {
-  const params = buildValidateOrder({ intentId: "i-1", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800 });
+  const params = buildValidateOrder({ intentId: "i-1", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800, tickSize: 0.1, lotDecimals: 8 });
   assert.equal(params.validate, "true");
   assert.equal(params.pair, "XBTGBP");
   assert.equal(params.type, "buy");
@@ -103,7 +146,7 @@ test("validateOrder refuses to send a request without validate=true", async () =
 test("validateOrder fails loudly if Kraken ever returns a txid", async () => {
   const env = { KRAKEN_TRADE_API_KEY: "k", KRAKEN_TRADE_API_SECRET: Buffer.from("s".repeat(20)).toString("base64") };
   const fetchImpl = async () => new Response(JSON.stringify({ error: [], result: { txid: ["OABC-1"] } }));
-  const params = buildValidateOrder({ intentId: "i-2", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800 });
+  const params = buildValidateOrder({ intentId: "i-2", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800, tickSize: 0.1, lotDecimals: 8 });
   await assert.rejects(() => validateOrder({ params, nonce: NOW * 1000, env, fetchImpl }), /unexpected txid/);
 });
 
@@ -114,7 +157,7 @@ test("validateOrder returns the description when Kraken only validates", async (
     assert.match(init.body, /validate=true/);
     return new Response(JSON.stringify({ error: [], result: { descr: { order: "buy 0.00100000 XBTGBP @ limit 100000.00" } } }));
   };
-  const params = buildValidateOrder({ intentId: "i-3", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800 });
+  const params = buildValidateOrder({ intentId: "i-3", volumeBase: 0.001, limitPrice: 100000, expireAtSeconds: NOW + 1800, tickSize: 0.1, lotDecimals: 8 });
   const r = await validateOrder({ params, nonce: NOW * 1000, env, fetchImpl });
   assert.match(r.description, /buy/);
 });

@@ -22,7 +22,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const JOURNAL_PATH = join(here, "journal.jsonl");
 
 export async function fetchSignal(url, fetchImpl = globalThis.fetch) {
-  const res = await fetchImpl(url, { headers: { Accept: "application/json" } });
+  const res = await fetchImpl(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(15000),
+  });
   if (!res.ok) throw new Error(`signal request failed (${res.status})`);
   return res.json();
 }
@@ -78,11 +81,17 @@ async function main() {
     model: process.env.LLM_MODEL || LLM_DEFAULTS.model,
   });
 
+  // Guard against overlap: a slow model call must not start a second review on top of the first.
+  let busy = false;
   const tick = async () => {
+    if (busy) return;
+    busy = true;
     try {
       printEntry(await runOnce({ signalUrl, llm }));
     } catch (err) {
       console.error(`run failed: ${err.message}. Nothing was approved.`);
+    } finally {
+      busy = false;
     }
   };
 

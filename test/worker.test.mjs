@@ -1,10 +1,26 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
-import worker, { parseOhlc, parseTicker, signKrakenRequest, nextNonce } from "../worker/src/index.js";
+import worker, { parseOhlc, parseTicker, signKrakenRequest, nextNonce, getTicker, clearCache } from "../worker/src/index.js";
 
 const realFetch = globalThis.fetch;
-afterEach(() => { globalThis.fetch = realFetch; });
+afterEach(() => { globalThis.fetch = realFetch; clearCache(); });
+
+test("public market data is cached so polling cannot exhaust Kraken's limit", async () => {
+  let calls = 0;
+  mockKraken([["/0/public/Ticker", () => { calls++; return json({ error: [], result: { XXBTZGBP: { c: ["50000", "1"], b: ["1", "1", "1"], a: ["1", "1", "1"] } } }); }]]);
+  await getTicker();
+  await getTicker();
+  await getTicker();
+  assert.equal(calls, 1, "three requests inside the cache window should make one Kraken call");
+});
+
+test("an empty Kraken balance result is treated as no balances, not a crash", async () => {
+  mockKraken([["/0/private/Balance", () => json({ error: [] })]]);
+  const res = await worker.fetch(req("/v1/account/balances"), env);
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).balances, []);
+});
 
 const SECRET_RAW = Buffer.from("fixture-secret-for-tests-only-0123456789abcdef");
 const env = {
