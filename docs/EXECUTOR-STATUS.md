@@ -12,7 +12,10 @@ This records what is built toward the trading plan in `TRADING-PLAN.md`, and wha
 | `executor/validate.mjs` | Validate-only client. It refuses any request without `validate=true`, and throws if Kraken ever returns a transaction id. |
 | `executor/reconcile.mjs` | Compares the local intent log with Kraken's open orders and flags any mismatch. |
 
-Tests: `test/executor.test.mjs`. Run `npm test`. There are 62 passing tests in total.
+| `executor/pipeline.mjs` | Dry run: combines the kill switch, pre-trade checks and single-use approval, then returns `ready` with a validate-only request or `blocked` with reasons. It never sends anything. |
+| `worker/src/index.js` → `/v1/market/pair-limits` | Public AssetPairs minimums for `XBTGBP`. Field names are unverified against Kraken's reference, and a missing field is an error. |
+
+Tests: `test/executor.test.mjs` and `test/drills.test.mjs` (scripted kill-switch, approval-replay, loss-stop and reconciliation drills). Run `npm test`: 71 passing.
 
 ## Not built, on purpose
 
@@ -21,6 +24,10 @@ Tests: `test/executor.test.mjs`. Run `npm test`. There are 62 passing tests in t
 - **Exchange-side stop-loss orders.** Kraken's AddOrder documentation lists `stop-loss` and `stop-loss-limit` order types (the `price` field is the trigger price, and `price2` is the limit price for the limit variant). Whether `XBTGBP` accepts these types is still unverified. Check the pair's available order types from the AssetPairs endpoint before relying on them.
 - **Order-state tracking after submission.** Needed for Stage 2 and depends on the submission path above.
 - **The approval interface.** `createApproval` exists, but nothing calls it yet. The dashboard does not yet issue tokens.
+- **Live submission function.** Deliberately absent. `prepareOrder` returns the validate-only request, and a later, explicitly enabled function would send it. That function is not written.
+- **Runtime stop-loss check.** Kraken's documentation lists stop-loss order types, but the pair-limits route does not yet report which order types `XBTGBP` accepts.
+- **Pair-limit field names.** `ordermin`, `costmin`, `tick_size` and `lot_decimals` are unverified against Kraken's reference page. Confirm them against a live response before relying on them.
+- **Stage 0 items.** Backtest on real candles, verified fee tier, paper track record, independent review and tax check all need your data and actions, not code.
 
 ## Before Stage 2 can be enabled
 

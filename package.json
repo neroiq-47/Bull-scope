@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/strategy.test.mjs test/worker.test.mjs test/backtest.test.mjs test/agent.test.mjs test/executor.test.mjs",
+    "test": "node --test test/strategy.test.mjs test/worker.test.mjs test/backtest.test.mjs test/agent.test.mjs test/executor.test.mjs test/drills.test.mjs",
     "backtest": "node tools/backtest.mjs",
     "agent": "node agent/run.mjs"
   },

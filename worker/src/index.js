@@ -115,6 +115,27 @@ export async function getTicker() {
   };
 }
 
+// Public pair metadata. Field names are unverified against Kraken's reference page (not reachable during
+// this build), so every required field is checked and a missing one is an error, never a default.
+export function parsePairLimits(result) {
+  const p = Object.values(result || {})[0];
+  if (!p) throw httpError("AssetPairs result missing", 502);
+  const ordermin = Number(p.ordermin);
+  const costmin = Number(p.costmin);
+  if (!(ordermin > 0) || !(costmin > 0)) throw httpError("pair minimums missing from AssetPairs", 502);
+  return {
+    minVolumeBase: ordermin,
+    minCostGbp: costmin,
+    tickSize: p.tick_size != null ? Number(p.tick_size) : null,
+    lotDecimals: p.lot_decimals != null ? Number(p.lot_decimals) : null,
+    source: "Kraken public AssetPairs",
+  };
+}
+
+export async function getPairLimits() {
+  return parsePairLimits(await krakenPublic("AssetPairs", { pair: PAIR }));
+}
+
 export async function getSignal() {
   const [r15, r5] = await Promise.all([
     krakenPublic("OHLC", { pair: PAIR, interval: 15 }),
@@ -194,6 +215,9 @@ export default {
     try {
       if (url.pathname === "/v1/market/btc-gbp") {
         return json(await getTicker(), 200, request, env);
+      }
+      if (url.pathname === "/v1/market/pair-limits") {
+        return json(await getPairLimits(), 200, request, env);
       }
       if (url.pathname === "/v1/signal/btc-gbp") {
         return json(await getSignal(), 200, request, env);
