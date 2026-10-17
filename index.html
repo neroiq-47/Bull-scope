@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Bull-Scope: paper-first, manual-approval BTC/GBP micro-swing dashboard for Kraken.">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#0b1220">
+  <title>Bull-Scope · BTC/GBP micro-swing</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="brand"><span class="logo" aria-hidden="true">₿</span> Bull-Scope</div>
+    <ul class="badges" aria-label="Security status">
+      <li class="badge ok">HTTPS</li>
+      <li class="badge ok">Paper mode</li>
+      <li class="badge ok">No live orders</li>
+      <li class="badge ok">No secrets in browser</li>
+    </ul>
+  </header>
+
+  <nav class="tabs" aria-label="Main">
+    <a href="#dashboard" data-route="dashboard">Dashboard</a>
+    <a href="#trades" data-route="trades">Trades</a>
+    <a href="#funds" data-route="funds">Funds</a>
+    <a href="#connect" data-route="connect">Connect</a>
+  </nav>
+
+  <main id="main">
+    <div id="flash" class="flash" role="status" aria-live="polite" hidden></div>
+
+    <!-- DASHBOARD -->
+    <section data-view="dashboard" aria-labelledby="dash-title">
+      <h1 id="dash-title" class="sr-only">Dashboard</h1>
+
+      <article class="card" aria-labelledby="price-title">
+        <h2 id="price-title">BTC/GBP · Kraken</h2>
+        <p class="price" id="price" aria-live="polite">Loading…</p>
+        <p class="muted small" id="price-meta"></p>
+      </article>
+
+      <article class="card" aria-labelledby="signal-title">
+        <h2 id="signal-title">Signal status</h2>
+        <div id="signal"><p class="muted">Loading candles…</p></div>
+        <p class="small muted" id="rejected" hidden></p>
+      </article>
+
+      <article class="card" aria-labelledby="portfolio-title">
+        <h2 id="portfolio-title">Portfolio overview</h2>
+        <div id="portfolio"><p class="muted">Connect Kraken on the Connect tab to see balances.</p></div>
+      </article>
+
+      <p class="disclaimer">Paper trades only. Nothing here places an order with Kraken. Not financial advice. Capital can be lost.</p>
+    </section>
+
+    <!-- TRADES -->
+    <section data-view="trades" aria-labelledby="trades-title" hidden>
+      <h1 id="trades-title">Trade approvals</h1>
+      <p class="muted">Long-only, spot, paper. The strategy proposes a trade; you approve or reject it. Approving records a paper position only.</p>
+
+      <h2>Awaiting approval</h2>
+      <div id="proposals" class="stack"></div>
+
+      <h2>Open paper trades</h2>
+      <div id="open-trades" class="stack"></div>
+
+      <details class="card">
+        <summary>How the strategy decides</summary>
+        <ol class="plain">
+          <li><strong>15-minute trend:</strong> EMA20 is above EMA50 and the last closed candle closes above EMA20.</li>
+          <li><strong>5-minute pullback:</strong> in the last 30 minutes, price dipped to the 5-minute EMA20 zone, then a bullish 5-minute candle closed back above it.</li>
+          <li><strong>Plan:</strong> stop sits just below the recent swing low (at least 0.2% away). Target is 2R. Size risks 1% of the £100 allocation, capped at 95% of it.</li>
+          <li><strong>Fee check:</strong> a plan is shown only if estimated round-trip fees leave a net reward-to-risk of at least 1.0.</li>
+        </ol>
+      </details>
+    </section>
+
+    <!-- FUNDS -->
+    <section data-view="funds" aria-labelledby="funds-title" hidden>
+      <h1 id="funds-title">Funds</h1>
+
+      <article class="card" aria-labelledby="card-title">
+        <h2 id="card-title">Add GBP by debit card</h2>
+        <p>Card payments are handled entirely by Kraken. Bull-Scope never sees or stores card details.</p>
+        <p class="small muted">Fees and limits are shown by Kraken during checkout.</p>
+        <a class="btn primary" href="https://www.kraken.com/" target="_blank" rel="noopener noreferrer">Open Kraken's deposit page (new tab)</a>
+      </article>
+
+      <article class="card" aria-labelledby="bank-title">
+        <h2 id="bank-title">Add GBP by bank transfer</h2>
+        <p>Your bank details are shown inside your own Kraken account. Bull-Scope does not display, store or ask for bank details.</p>
+        <p class="small muted">Transfer times and fees depend on your bank and on Kraken. Check the funding page before sending.</p>
+        <a class="btn ghost" href="https://www.kraken.com/" target="_blank" rel="noopener noreferrer">Open Kraken's funding page (new tab)</a>
+      </article>
+
+      <article class="card" aria-labelledby="wd-title">
+        <h2 id="wd-title">Withdrawal fee preview</h2>
+        <p class="small muted">Preview only. Bull-Scope cannot withdraw funds in this version.</p>
+        <form id="withdraw-form" class="form">
+          <label for="wd-amount">Amount to withdraw (GBP)</label>
+          <input id="wd-amount" name="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="e.g. 50">
+        </form>
+        <div id="wd-result" class="result" role="status" aria-live="polite">Enter an amount to preview fees.</div>
+        <p class="small muted">A £0.00 fee is labelled verified only when the method is checked against Kraken's current quote. Otherwise every figure is an estimate.</p>
+      </article>
+
+      <article class="card" aria-labelledby="fees-title">
+        <h2 id="fees-title">Fee and processing disclosures</h2>
+        <ul class="plain">
+          <li>Trading fees on Kraken depend on your 30-day volume tier and whether you add or take liquidity.</li>
+          <li>Estimates here use a taker fee placeholder of 0.40% per side. Check your live fee tier before relying on any figure.</li>
+          <li>Deposits and withdrawals can take time to clear and may carry Kraken or bank fees.</li>
+          <li>A withdrawal is never described as fee-free unless the selected method is verified eligible and the current quote shows zero fees.</li>
+        </ul>
+      </article>
+    </section>
+
+    <!-- CONNECT -->
+    <section data-view="connect" aria-labelledby="connect-title" hidden>
+      <h1 id="connect-title">Connect Kraken (read-only)</h1>
+      <p class="muted">Read-only is the first integration. It lets Bull-Scope show your balances. It cannot trade, deposit or withdraw.</p>
+
+      <article class="card" aria-labelledby="steps-title">
+        <h2 id="steps-title">Setup steps</h2>
+        <ol class="plain steps">
+          <li>Sign in at <a href="https://www.kraken.com/" target="_blank" rel="noopener noreferrer">kraken.com</a> directly. Do not use links from emails or messages.</li>
+          <li>Open account settings and go to the API section.</li>
+          <li>Create a new key with <strong>Query Funds</strong> as the only permission.</li>
+          <li><strong>Leave every other permission off</strong>, especially trading, deposits and withdrawals.</li>
+          <li>If Kraken offers an IP allowlist, restrict the key to your server's outbound IP.</li>
+          <li>Store the key and secret as server-side secrets (see the README). <strong>Never paste them into this website.</strong></li>
+          <li>Return here and press <em>Test connection</em>.</li>
+        </ol>
+      </article>
+
+      <article class="card" aria-labelledby="status-title">
+        <h2 id="status-title">Connection status</h2>
+        <div id="connection-status"><p class="muted">Not tested yet.</p></div>
+        <button id="test-connection" class="btn primary" type="button">Test connection</button>
+      </article>
+
+      <article class="card" aria-labelledby="sec-title">
+        <h2 id="sec-title">Security checklist</h2>
+        <ul class="plain">
+          <li>Bull-Scope never asks for card details, bank logins, exchange passwords or API secrets.</li>
+          <li>The browser holds no Kraken credentials. Balance requests go through the server component.</li>
+          <li>The server accepts only read-only endpoints and calls only Kraken's Balance method.</li>
+          <li>No order, leverage, short or withdrawal code exists in this version.</li>
+        </ul>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p class="small muted">Bull-Scope is paper-first. No live orders, leverage, shorting or withdrawals. Estimates are labelled as such. Not financial advice.</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

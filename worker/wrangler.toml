@@ -1,0 +1,13 @@
+name = "bull-scope-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Set these in the Cloudflare dashboard or with `wrangler secret put`. Never commit them.
+#   KRAKEN_API_KEY      (read-only key, Query Funds permission only)
+#   KRAKEN_API_SECRET   (matching secret)
+#
+# Comma-separated origins allowed to call the API from a browser, e.g. https://bull-scope.example.com
+[vars]
+ALLOWED_ORIGINS = ""
+
+# Free-tier friendly: no cron, no Durable Objects, no R2 in v1. Stays well within the £25/month ceiling.

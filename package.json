@@ -1,0 +1,15 @@
+{
+  "name": "bull-scope",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Paper-first, manual-approval BTC/GBP micro-swing dashboard for Kraken (read-only).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/strategy.test.mjs test/worker.test.mjs test/backtest.test.mjs",
+    "backtest": "node tools/backtest.mjs"
+  },
+  "license": "UNLICENSED"
+}

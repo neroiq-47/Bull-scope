@@ -1,0 +1,10 @@
+# Security headers for Cloudflare Pages (or any host that reads a _headers file).
+# Replace REPLACE-WITH-WORKER-HOST with your Worker host, e.g. bull-scope-api.<subdomain>.workers.dev
+# Without that change, the browser will block all API calls.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://REPLACE-WITH-WORKER-HOST; img-src 'self' data:; base-uri 'none'; object-src 'none'; form-action 'none'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
